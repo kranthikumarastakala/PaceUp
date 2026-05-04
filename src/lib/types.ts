@@ -21,6 +21,8 @@ export interface Profile {
   bio: string
   location: string
   unit_system: 'metric' | 'imperial'
+  dark_mode: boolean
+  strava_id: string | null
   created_at: string
 }
 
@@ -150,4 +152,76 @@ export interface TrainingPlanDay {
   target_distance: number | null  // meters
   target_duration: number | null  // seconds
   notes: string | null
+}
+
+// ─── Phase 6 ──────────────────────────────────────────────────────────────
+
+export interface Challenge {
+  id: string
+  creator_id: string
+  title: string
+  description: string | null
+  activity_type: ActivityType | 'all'
+  metric: 'distance' | 'duration' | 'elevation' | 'activities'
+  target_value: number
+  starts_at: string
+  ends_at: string
+  is_public: boolean
+  participant_count: number
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface ChallengeParticipant {
+  challenge_id: string
+  user_id: string
+  progress: number
+  joined_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface Club {
+  id: string
+  owner_id: string
+  name: string
+  description: string | null
+  activity_type: ActivityType | 'all'
+  avatar_url: string | null
+  is_public: boolean
+  member_count: number
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface ClubMember {
+  club_id: string
+  user_id: string
+  role: 'owner' | 'member'
+  joined_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface Segment {
+  id: string
+  user_id: string
+  name: string
+  activity_type: ActivityType
+  polyline: GpxPoint[]
+  distance: number
+  elevation_gain: number | null
+  is_public: boolean
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface SegmentEffort {
+  id: string
+  segment_id: string
+  activity_id: string
+  user_id: string
+  elapsed_time: number   // seconds
+  is_pr: boolean
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+  activities?: Pick<Activity, 'title' | 'created_at'>
 }

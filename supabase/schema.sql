@@ -318,3 +318,127 @@ create policy "Plan owner can manage days" on public.training_plan_days
 -- create table if not exists public.training_plan_days ( ... see above ... );
 -- Enable Realtime for messages: alter publication supabase_realtime add table public.messages;
 
+-- ─── Phase 6: Analytics, Challenges, Clubs, Segments, Dark Mode ───────────
+
+-- Challenges
+create table public.challenges (
+  id uuid default gen_random_uuid() primary key,
+  creator_id uuid references public.profiles(id) on delete cascade not null,
+  title text not null,
+  description text,
+  activity_type text default 'all',
+  metric text not null check (metric in ('distance','duration','elevation','activities')),
+  target_value float not null,
+  starts_at timestamptz not null,
+  ends_at timestamptz not null,
+  is_public boolean default true,
+  participant_count int default 0,
+  created_at timestamptz default now()
+);
+alter table public.challenges enable row level security;
+create policy "Public challenges are viewable" on public.challenges
+  for select using (is_public = true or auth.uid() = creator_id);
+create policy "Users can create challenges" on public.challenges
+  for insert with check (auth.uid() = creator_id);
+create policy "Creators can update own challenges" on public.challenges
+  for update using (auth.uid() = creator_id);
+
+-- Challenge participants
+create table public.challenge_participants (
+  challenge_id uuid references public.challenges(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  progress float default 0,
+  joined_at timestamptz default now(),
+  primary key (challenge_id, user_id)
+);
+alter table public.challenge_participants enable row level security;
+create policy "Challenge participants are viewable" on public.challenge_participants for select using (true);
+create policy "Users can join challenges" on public.challenge_participants
+  for insert with check (auth.uid() = user_id);
+create policy "Users can update own progress" on public.challenge_participants
+  for update using (auth.uid() = user_id);
+create policy "Users can leave challenges" on public.challenge_participants
+  for delete using (auth.uid() = user_id);
+
+-- Clubs
+create table public.clubs (
+  id uuid default gen_random_uuid() primary key,
+  owner_id uuid references public.profiles(id) on delete cascade not null,
+  name text not null,
+  description text,
+  activity_type text default 'all',
+  avatar_url text,
+  is_public boolean default true,
+  member_count int default 1,
+  created_at timestamptz default now()
+);
+alter table public.clubs enable row level security;
+create policy "Public clubs are viewable" on public.clubs
+  for select using (is_public = true or auth.uid() = owner_id);
+create policy "Users can create clubs" on public.clubs
+  for insert with check (auth.uid() = owner_id);
+create policy "Owners can update clubs" on public.clubs
+  for update using (auth.uid() = owner_id);
+create policy "Owners can delete clubs" on public.clubs
+  for delete using (auth.uid() = owner_id);
+
+-- Club members
+create table public.club_members (
+  club_id uuid references public.clubs(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  role text default 'member' check (role in ('owner','member')),
+  joined_at timestamptz default now(),
+  primary key (club_id, user_id)
+);
+alter table public.club_members enable row level security;
+create policy "Club members are viewable" on public.club_members for select using (true);
+create policy "Users can join clubs" on public.club_members
+  for insert with check (auth.uid() = user_id);
+create policy "Users can leave clubs" on public.club_members
+  for delete using (auth.uid() = user_id);
+
+-- Segments
+create table public.segments (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  name text not null,
+  activity_type text default 'run',
+  polyline jsonb not null,
+  distance float not null,
+  elevation_gain float,
+  is_public boolean default true,
+  created_at timestamptz default now()
+);
+alter table public.segments enable row level security;
+create policy "Public segments are viewable" on public.segments
+  for select using (is_public = true or auth.uid() = user_id);
+create policy "Users can create segments" on public.segments
+  for insert with check (auth.uid() = user_id);
+create policy "Users can delete own segments" on public.segments
+  for delete using (auth.uid() = user_id);
+
+-- Segment efforts (times)
+create table public.segment_efforts (
+  id uuid default gen_random_uuid() primary key,
+  segment_id uuid references public.segments(id) on delete cascade not null,
+  activity_id uuid references public.activities(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  elapsed_time int not null,
+  is_pr boolean default false,
+  created_at timestamptz default now()
+);
+alter table public.segment_efforts enable row level security;
+create policy "Segment efforts are viewable" on public.segment_efforts for select using (true);
+create policy "Users can log own efforts" on public.segment_efforts
+  for insert with check (auth.uid() = user_id);
+
+-- Phase 6 migration only (existing DB):
+-- alter table public.profiles add column if not exists dark_mode boolean default false;
+-- alter table public.profiles add column if not exists strava_id text;
+-- create table if not exists public.challenges ( ... see above ... );
+-- create table if not exists public.challenge_participants ( ... see above ... );
+-- create table if not exists public.clubs ( ... see above ... );
+-- create table if not exists public.club_members ( ... see above ... );
+-- create table if not exists public.segments ( ... see above ... );
+-- create table if not exists public.segment_efforts ( ... see above ... );
+

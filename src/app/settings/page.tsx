@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ToastProvider'
-import { Settings, Ruler, Bell, LogOut } from 'lucide-react'
+import { Settings, Ruler, Bell, LogOut, Moon } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -15,6 +15,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [unitSystem, setUnitSystem] = useState<'metric' | 'imperial'>('metric')
+  const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -22,14 +23,24 @@ export default function SettingsPage() {
       if (!user) { router.push('/login'); return }
       const { data } = await supabase
         .from('profiles')
-        .select('unit_system')
+        .select('unit_system, dark_mode')
         .eq('id', user.id)
         .single()
       if (data?.unit_system) setUnitSystem(data.unit_system as 'metric' | 'imperial')
+      if (data != null) setDarkMode((data as { dark_mode: boolean }).dark_mode ?? false)
       setLoading(false)
     }
     load()
   }, [])
+
+  // Live preview dark mode as toggle flips
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark')
+    } else {
+      document.documentElement.removeAttribute('data-theme')
+    }
+  }, [darkMode])
 
   const handleSave = async () => {
     setSaving(true)
@@ -37,11 +48,12 @@ export default function SettingsPage() {
     if (!user) return
     const { error } = await supabase
       .from('profiles')
-      .update({ unit_system: unitSystem })
+      .update({ unit_system: unitSystem, dark_mode: darkMode })
       .eq('id', user.id)
     if (error) {
       toast(error.message, 'error')
     } else {
+      localStorage.setItem('paceup_dark_mode', String(darkMode))
       toast('Settings saved!', 'success')
     }
     setSaving(false)
@@ -61,17 +73,16 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-xl mx-auto px-4 py-8 space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-3">
         <Settings size={22} className="text-orange-500" />
-        <h1 className="text-2xl font-extrabold text-gray-900">Settings</h1>
+        <h1 className="text-2xl font-extrabold">Settings</h1>
       </div>
 
       {/* Units */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+      <div className="bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl p-6 shadow-sm" style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)' }}>
         <div className="flex items-center gap-2 mb-4">
           <Ruler size={16} className="text-gray-400" />
-          <h2 className="font-bold text-gray-800">Units of Measurement</h2>
+          <h2 className="font-bold">Units of Measurement</h2>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {(['metric', 'imperial'] as const).map((sys) => (
@@ -82,10 +93,10 @@ export default function SettingsPage() {
               className={`p-4 rounded-xl border-2 text-left transition-all ${
                 unitSystem === sys
                   ? 'border-orange-500 bg-orange-50'
-                  : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                  : 'border-gray-100 hover:border-gray-200'
               }`}
             >
-              <div className={`font-semibold capitalize ${unitSystem === sys ? 'text-orange-700' : 'text-gray-700'}`}>
+              <div className={`font-semibold capitalize ${unitSystem === sys ? 'text-orange-700' : ''}`}>
                 {sys}
               </div>
               <div className="text-xs text-gray-400 mt-1">
@@ -94,45 +105,66 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">
-          Affects how distances, pace, and elevation are displayed throughout the app.
-        </p>
       </div>
 
-      {/* Notifications placeholder */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+      {/* Dark Mode */}
+      <div className="rounded-2xl p-6 shadow-sm border" style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)' }}>
+        <div className="flex items-center gap-2 mb-4">
+          <Moon size={16} className="text-gray-400" />
+          <h2 className="font-bold">Appearance</h2>
+        </div>
+        <label className="flex items-center justify-between cursor-pointer py-1">
+          <div>
+            <p className="text-sm font-medium">Dark Mode</p>
+            <p className="text-xs text-gray-400 mt-0.5">Easy on the eyes at night</p>
+          </div>
+          <div
+            onClick={() => setDarkMode(!darkMode)}
+            className={`relative w-11 h-6 rounded-full transition-colors ${darkMode ? 'bg-orange-500' : 'bg-gray-300'}`}
+          >
+            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-transform ${darkMode ? 'translate-x-6' : 'translate-x-1'}`} />
+          </div>
+        </label>
+      </div>
+
+      {/* Notifications */}
+      <div className="rounded-2xl p-6 shadow-sm border" style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)' }}>
         <div className="flex items-center gap-2 mb-4">
           <Bell size={16} className="text-gray-400" />
-          <h2 className="font-bold text-gray-800">Notifications</h2>
+          <h2 className="font-bold">Notifications</h2>
         </div>
         <div className="space-y-3">
-          {[
-            { label: 'Kudos on my activities', defaultOn: true },
-            { label: 'Comments on my activities', defaultOn: true },
-            { label: 'New followers', defaultOn: true },
-          ].map(({ label }) => (
+          {['Kudos on my activities', 'Comments on my activities', 'New followers'].map((label) => (
             <div key={label} className="flex items-center justify-between py-1">
-              <span className="text-sm text-gray-700">{label}</span>
+              <span className="text-sm">{label}</span>
               <div className="relative w-9 h-5 rounded-full bg-orange-500">
                 <span className="absolute top-0.5 right-0.5 w-4 h-4 bg-white rounded-full shadow" />
               </div>
             </div>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">Notification preferences coming in a future update.</p>
+        <p className="text-xs text-gray-400 mt-3">Full notification preferences coming soon.</p>
       </div>
 
-      {/* Account links */}
-      <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm space-y-3">
-        <h2 className="font-bold text-gray-800 mb-2">Account</h2>
+      {/* Account */}
+      <div className="rounded-2xl p-6 shadow-sm border" style={{ background: 'var(--surface)', borderColor: 'var(--surface-border)' }}>
+        <h2 className="font-bold mb-3">Account</h2>
         <Link
           href="/profile/edit"
-          className="flex items-center justify-between py-2 text-sm text-gray-700 hover:text-orange-600 transition-colors"
+          className="flex items-center justify-between py-2 text-sm hover:text-orange-600 transition-colors"
         >
           Edit Profile
           <span className="text-gray-300">›</span>
         </Link>
-        <div className="border-t border-gray-50" />
+        <div className="border-t" style={{ borderColor: 'var(--surface-border)' }} />
+        <Link
+          href="/strava/connect"
+          className="flex items-center justify-between py-2 text-sm hover:text-orange-600 transition-colors"
+        >
+          Connect Strava Account
+          <span className="text-gray-300">›</span>
+        </Link>
+        <div className="border-t" style={{ borderColor: 'var(--surface-border)' }} />
         <button
           onClick={handleLogout}
           className="flex items-center gap-2 py-2 text-sm text-red-500 hover:text-red-700 transition-colors w-full"
@@ -142,7 +174,6 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      {/* Save */}
       <button
         onClick={handleSave}
         disabled={saving}

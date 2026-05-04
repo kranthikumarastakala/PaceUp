@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ToastProvider } from "@/components/ToastProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,11 +26,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.className} bg-slate-50 text-gray-900 min-h-screen`}>
-        <ToastProvider>
-          <Navbar />
-          <main className="pt-16">{children}</main>
-        </ToastProvider>
+      <body className={`${inter.className} min-h-screen`} style={{ background: 'var(--bg)', color: 'var(--text-primary)' }}>
+        <ThemeProvider>
+          <ToastProvider>
+            <Navbar />
+            <main className="pt-16">{children}</main>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
