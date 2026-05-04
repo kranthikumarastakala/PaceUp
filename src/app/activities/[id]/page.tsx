@@ -1,52 +1,77 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RouteMap } from '@/components/RouteMap'
 import { ElevationChart } from '@/components/ElevationChart'
+import { useToast } from '@/components/ToastProvider'
 import type { Activity } from '@/lib/types'
 import {
   formatDistance, formatDuration, formatPace, formatSpeed,
   formatElevation, activityIcon, activityColor, timeAgo
 } from '@/lib/utils'
-import { Heart, Clock, TrendingUp, Zap, Flame, MapPin } from 'lucide-react'
+import { Heart, Clock, TrendingUp, Zap, Flame, MapPin, Pencil, Trash2, X } from 'lucide-react'
+import { Comments } from '@/components/Comments'
 
 export default function ActivityDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const [activity, setActivity] = useState<Activity | null>(null)
   const [loading, setLoading] = useState(true)
   const [kudos, setKudos] = useState(0)
   const [liked, setLiked] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const supabase = createClient()
+  const { toast } = useToast()
 
   useEffect(() => {
     const load = async () => {
-      const { data } = await supabase
-        .from('activities')
-        .select('*, profiles(username, full_name, avatar_url)')
-        .eq('id', params.id)
-        .single()
-      if (data) {
-        setActivity(data as Activity)
-        setKudos(data.kudos_count ?? 0)
+      const [{ data: activityData }, { data: { user } }] = await Promise.all([
+        supabase
+          .from('activities')
+          .select('*, profiles(username, full_name, avatar_url)')
+          .eq('id', params.id)
+          .single(),
+        supabase.auth.getUser(),
+      ])
+      if (activityData) {
+        setActivity(activityData as Activity)
+        setKudos(activityData.kudos_count ?? 0)
       }
+      setCurrentUserId(user?.id ?? null)
       setLoading(false)
     }
     load()
   }, [params.id])
 
   const handleKudos = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user || !activity) return
+    if (!currentUserId || !activity) return
     if (liked) {
-      await supabase.from('kudos').delete().match({ activity_id: activity.id, user_id: user.id })
+      await supabase.from('kudos').delete().match({ activity_id: activity.id, user_id: currentUserId })
       setKudos((k) => k - 1)
     } else {
-      await supabase.from('kudos').insert({ activity_id: activity.id, user_id: user.id })
+      await supabase.from('kudos').insert({ activity_id: activity.id, user_id: currentUserId })
       setKudos((k) => k + 1)
     }
     setLiked(!liked)
+  }
+
+  const handleDelete = async () => {
+    if (!activity) return
+    setDeleting(true)
+    const { error } = await supabase.from('activities').delete().eq('id', activity.id)
+    if (error) {
+      toast(error.message, 'error')
+      setDeleting(false)
+      setShowDeleteModal(false)
+    } else {
+      toast('Activity deleted', 'success')
+      router.push('/activities')
+    }
   }
 
   if (loading) return <div className="max-w-2xl mx-auto px-4 py-8 animate-pulse">
@@ -69,16 +94,39 @@ export default function ActivityDetailPage() {
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-6">
       {/* Header */}
       <div>
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
-          <span>{activityIcon(activity.type)}</span>
-          <span className={activityColor(activity.type) + ' font-medium capitalize'}>{activity.type}</span>
-          <span>·</span>
-          <span>{timeAgo(activity.created_at)}</span>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-400 mb-1">
+              <span>{activityIcon(activity.type)}</span>
+              <span className={activityColor(activity.type) + ' font-medium capitalize'}>{activity.type}</span>
+              <span>·</span>
+              <span>{timeAgo(activity.created_at)}</span>
+            </div>
+            <h1 className="text-3xl font-bold">{activity.title}</h1>
+            {activity.profiles && (
+              <p className="text-gray-400 mt-1">by {activity.profiles.full_name || activity.profiles.username}</p>
+            )}
+          </div>
+          {/* Owner actions */}
+          {currentUserId === activity.user_id && (
+            <div className="flex items-center gap-1 shrink-0">
+              <Link
+                href={`/activities/${activity.id}/edit`}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+              >
+                <Pencil size={15} />
+                Edit
+              </Link>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <Trash2 size={15} />
+                Delete
+              </button>
+            </div>
+          )}
         </div>
-        <h1 className="text-3xl font-bold">{activity.title}</h1>
-        {activity.profiles && (
-          <p className="text-gray-400 mt-1">by {activity.profiles.full_name || activity.profiles.username}</p>
-        )}
       </div>
 
       {/* Map */}
@@ -127,6 +175,45 @@ export default function ActivityDetailPage() {
           {kudos} {kudos === 1 ? 'Kudo' : 'Kudos'}
         </button>
       </div>
+
+      {/* Comments */}
+      <Comments activityId={activity.id} />
+
+      {/* Delete confirmation modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-gray-900">Delete Activity?</h2>
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-700 rounded-lg transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-6">
+              <span className="font-semibold text-gray-800">&ldquo;{activity.title}&rdquo;</span> will be
+              permanently deleted. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2.5 rounded-xl font-medium text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl font-medium text-sm bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white transition-colors"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

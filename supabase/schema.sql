@@ -48,11 +48,21 @@ create table public.follows (
   primary key (follower_id, following_id)
 );
 
+-- Comments table
+create table public.comments (
+  id uuid default gen_random_uuid() primary key,
+  activity_id uuid references public.activities(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  body text not null check (char_length(body) >= 1 and char_length(body) <= 1000),
+  created_at timestamptz default now()
+);
+
 -- Row Level Security
 alter table public.profiles enable row level security;
 alter table public.activities enable row level security;
 alter table public.kudos enable row level security;
 alter table public.follows enable row level security;
+alter table public.comments enable row level security;
 
 create policy "Public profiles are viewable by everyone" on public.profiles for select using (true);
 create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
@@ -70,6 +80,18 @@ create policy "Users can remove own kudos" on public.kudos for delete using (aut
 create policy "Follows are viewable by everyone" on public.follows for select using (true);
 create policy "Users can follow others" on public.follows for insert with check (auth.uid() = follower_id);
 create policy "Users can unfollow" on public.follows for delete using (auth.uid() = follower_id);
+
+create policy "Comments on public activities are viewable" on public.comments
+  for select using (
+    exists (
+      select 1 from public.activities a
+      where a.id = activity_id and (a.is_public = true or a.user_id = auth.uid())
+    )
+  );
+create policy "Authenticated users can comment" on public.comments
+  for insert with check (auth.uid() = user_id);
+create policy "Users can delete own comments" on public.comments
+  for delete using (auth.uid() = user_id);
 
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()

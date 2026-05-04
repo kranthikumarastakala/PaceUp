@@ -4,22 +4,21 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/ToastProvider'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
   const [fullName, setFullName] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
 
     const { error } = await supabase.auth.signUp({
       email,
@@ -31,13 +30,11 @@ export default function SignupPage() {
     })
 
     if (error) {
-      setError(error.message)
+      toast(error.message, 'error')
       setLoading(false)
     } else {
-      // Supabase may require email confirmation — handle both cases
-      setSuccess(true)
+      toast('Account created! Check your email if confirmation is required.', 'success')
       setLoading(false)
-      // If email confirmation is disabled, go straight to dashboard
       setTimeout(async () => {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) router.push('/dashboard')
@@ -55,16 +52,6 @@ export default function SignupPage() {
         </div>
 
         <form onSubmit={handleSignup} className="bg-white border border-gray-100 rounded-3xl p-8 space-y-5 shadow-xl shadow-gray-100">
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 text-sm px-4 py-3 rounded-xl">
-              ✅ Account created! Check your email to confirm, or you may be logged in already.
-            </div>
-          )}
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
-              {error}
-            </div>
-          )}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">Full Name</label>

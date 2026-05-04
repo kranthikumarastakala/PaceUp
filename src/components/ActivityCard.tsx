@@ -14,6 +14,7 @@ import {
   timeAgo,
 } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/ToastProvider'
 
 interface Props {
   activity: Activity
@@ -23,11 +24,12 @@ interface Props {
 export function ActivityCard({ activity, showAuthor }: Props) {
   const [kudos, setKudos] = useState(activity.kudos_count ?? 0)
   const [liked, setLiked] = useState(false)
+  const { toast } = useToast()
 
   const handleKudos = async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { toast('Sign in to give kudos', 'info'); return }
 
     if (liked) {
       await supabase.from('kudos').delete().match({ activity_id: activity.id, user_id: user.id })
@@ -35,7 +37,6 @@ export function ActivityCard({ activity, showAuthor }: Props) {
     } else {
       await supabase.from('kudos').insert({ activity_id: activity.id, user_id: user.id })
       setKudos((k) => k + 1)
-      // Update count on activity
       await supabase.from('activities').update({ kudos_count: kudos + 1 }).eq('id', activity.id)
     }
     setLiked(!liked)

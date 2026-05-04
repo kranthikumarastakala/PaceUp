@@ -43,3 +43,12 @@ export interface Kudos {
   user_id: string
   created_at: string
 }
+
+export interface Comment {
+  id: string
+  activity_id: string
+  user_id: string
+  body: string
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}

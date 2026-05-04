@@ -4,22 +4,22 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/ToastProvider'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      setError(error.message)
+      toast(error.message, 'error')
       setLoading(false)
     } else {
       router.push('/dashboard')
@@ -36,11 +36,6 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="bg-white border border-gray-100 rounded-3xl p-8 space-y-5 shadow-xl shadow-gray-100">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl">
-              {error}
-            </div>
-          )}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email</label>
             <input

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { ActivityCard } from '@/components/ActivityCard'
+import { useToast } from '@/components/ToastProvider'
 import type { Activity, Profile } from '@/lib/types'
 import { MapPin, Calendar, UserPlus, UserMinus, UserCheck } from 'lucide-react'
 import { format } from 'date-fns'
@@ -21,6 +22,7 @@ export default function PublicProfilePage() {
   const [loading, setLoading] = useState(true)
   const [followLoading, setFollowLoading] = useState(false)
   const supabase = createClient()
+  const { toast } = useToast()
 
   useEffect(() => {
     const load = async () => {
@@ -86,10 +88,12 @@ export default function PublicProfilePage() {
       await supabase.from('follows').delete().match({ follower_id: currentUserId, following_id: profile.id })
       setIsFollowing(false)
       setFollowerCount((c) => c - 1)
+      toast(`Unfollowed ${profile.full_name || profile.username}`, 'info')
     } else {
       await supabase.from('follows').insert({ follower_id: currentUserId, following_id: profile.id })
       setIsFollowing(true)
       setFollowerCount((c) => c + 1)
+      toast(`Following ${profile.full_name || profile.username}!`, 'success')
     }
     setFollowLoading(false)
   }
