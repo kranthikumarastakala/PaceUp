@@ -60,6 +60,8 @@ export interface Activity {
   is_public: boolean
   kudos_count: number
   photo_url: string | null
+  avg_heart_rate: number | null
+  max_heart_rate: number | null
   created_at: string
   profiles?: Profile
   activity_photos?: ActivityPhoto[]
@@ -224,4 +226,93 @@ export interface SegmentEffort {
   created_at: string
   profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
   activities?: Pick<Activity, 'title' | 'created_at'>
+}
+
+// ─── Phase 7 ──────────────────────────────────────────────────────────────
+
+export interface Event {
+  id: string
+  creator_id: string
+  title: string
+  description: string | null
+  activity_type: ActivityType | 'all'
+  event_date: string
+  location: string | null
+  distance: number | null      // meters
+  elevation_gain: number | null
+  is_public: boolean
+  is_virtual: boolean
+  participant_count: number
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface EventParticipant {
+  event_id: string
+  user_id: string
+  rsvp: 'going' | 'maybe' | 'not_going'
+  finish_time: number | null  // seconds
+  joined_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface Story {
+  id: string
+  user_id: string
+  activity_id: string | null
+  media_url: string
+  caption: string | null
+  expires_at: string
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+  activities?: Pick<Activity, 'title' | 'type'>
+}
+
+export type ReactionEmoji = '🔥' | '💪' | '👏' | '😮' | '❤️'
+
+export interface Reaction {
+  id: string
+  activity_id: string
+  user_id: string
+  emoji: ReactionEmoji
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface PushSubscription {
+  id: string
+  user_id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  created_at: string
+}
+
+export interface AdminFlag {
+  id: string
+  reporter_id: string
+  content_type: 'activity' | 'comment' | 'profile'
+  content_id: string
+  reason: string
+  status: 'open' | 'reviewed' | 'dismissed'
+  created_at: string
+  reporter?: Pick<Profile, 'username'>
+}
+
+// Heart-rate zone breakdown (computed, not stored)
+export interface HRZone {
+  zone: number       // 1–5
+  label: string
+  min_hr: number
+  max_hr: number
+  seconds: number
+  color: string
+}
+
+// Fitness / Fatigue
+export interface FitnessPoint {
+  date: string
+  ctl: number   // Chronic Training Load (fitness)
+  atl: number   // Acute Training Load (fatigue)
+  tsb: number   // Training Stress Balance (form)
 }

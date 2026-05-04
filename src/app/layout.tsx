@@ -4,6 +4,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { ToastProvider } from "@/components/ToastProvider";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen`} style={{ background: 'var(--bg)', color: 'var(--text-primary)' }}>
         <ThemeProvider>
           <ToastProvider>
+            <ServiceWorkerRegistrar />
             <Navbar />
             <main className="pt-16">{children}</main>
           </ToastProvider>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Activity, Home, User, BarChart2, Target, Trophy, Settings, MessageCircle, Map, ClipboardList, TrendingUp, CalendarDays, Shield, Layers, Brain, Zap, Menu, X, Search, PlusCircle, LogOut } from 'lucide-react'
+import { Activity, Home, User, BarChart2, Target, Trophy, Settings, MessageCircle, Map, ClipboardList, TrendingUp, CalendarDays, Shield, Layers, Brain, Zap, Menu, X, Search, PlusCircle, LogOut, Calendar, Upload, BarChart, Flag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
@@ -14,15 +14,19 @@ const navLinks = [
   { href: '/activities', label: 'Activities', icon: Activity },
   { href: '/stats', label: 'Stats', icon: BarChart2 },
   { href: '/analytics', label: 'Analytics', icon: TrendingUp },
+  { href: '/analytics/advanced', label: 'Adv. Analytics', icon: BarChart },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
   { href: '/goals', label: 'Goals', icon: Target },
   { href: '/challenges', label: 'Challenges', icon: Trophy },
   { href: '/clubs', label: 'Clubs', icon: Shield },
+  { href: '/events', label: 'Events', icon: Calendar },
   { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   { href: '/segments', label: 'Segments', icon: Layers },
   { href: '/routes', label: 'Routes', icon: Map },
   { href: '/training', label: 'Training', icon: ClipboardList },
   { href: '/coach', label: 'AI Coach', icon: Brain },
+  { href: '/search', label: 'Discover', icon: Search },
+  { href: '/import', label: 'Import', icon: Upload },
   { href: '/messages', label: 'Messages', icon: MessageCircle },
   { href: '/strava/connect', label: 'Strava', icon: Zap },
   { href: '/profile', label: 'Profile', icon: User },

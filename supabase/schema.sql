@@ -442,3 +442,122 @@ create policy "Users can log own efforts" on public.segment_efforts
 -- create table if not exists public.segments ( ... see above ... );
 -- create table if not exists public.segment_efforts ( ... see above ... );
 
+-- ─── Phase 7: Push Notifications, Events, Stories, Reactions, Admin ───────
+
+-- Events & Races
+create table public.events (
+  id uuid default gen_random_uuid() primary key,
+  creator_id uuid references public.profiles(id) on delete cascade not null,
+  title text not null,
+  description text,
+  activity_type text default 'run',
+  event_date timestamptz not null,
+  location text,
+  distance float,
+  elevation_gain float,
+  is_public boolean default true,
+  is_virtual boolean default false,
+  participant_count int default 0,
+  created_at timestamptz default now()
+);
+alter table public.events enable row level security;
+create policy "Public events are viewable" on public.events
+  for select using (is_public = true or auth.uid() = creator_id);
+create policy "Users can create events" on public.events
+  for insert with check (auth.uid() = creator_id);
+create policy "Creators can update events" on public.events
+  for update using (auth.uid() = creator_id);
+create policy "Creators can delete events" on public.events
+  for delete using (auth.uid() = creator_id);
+
+-- Event participants (RSVP + results)
+create table public.event_participants (
+  event_id uuid references public.events(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  rsvp text default 'going' check (rsvp in ('going','maybe','not_going')),
+  finish_time int,   -- seconds
+  joined_at timestamptz default now(),
+  primary key (event_id, user_id)
+);
+alter table public.event_participants enable row level security;
+create policy "Event participants are viewable" on public.event_participants for select using (true);
+create policy "Users can RSVP to events" on public.event_participants
+  for insert with check (auth.uid() = user_id);
+create policy "Users can update own RSVP" on public.event_participants
+  for update using (auth.uid() = user_id);
+create policy "Users can cancel RSVP" on public.event_participants
+  for delete using (auth.uid() = user_id);
+
+-- Stories (24-hour expiring content)
+create table public.stories (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  activity_id uuid references public.activities(id) on delete set null,
+  media_url text not null,
+  caption text,
+  expires_at timestamptz not null default (now() + interval '24 hours'),
+  created_at timestamptz default now()
+);
+alter table public.stories enable row level security;
+create policy "Stories from followed users are viewable" on public.stories for select using (true);
+create policy "Users can create own stories" on public.stories
+  for insert with check (auth.uid() = user_id);
+create policy "Users can delete own stories" on public.stories
+  for delete using (auth.uid() = user_id);
+
+-- Activity reactions (emoji reactions beyond kudos)
+create table public.reactions (
+  id uuid default gen_random_uuid() primary key,
+  activity_id uuid references public.activities(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  emoji text not null check (emoji in ('🔥','💪','👏','😮','❤️')),
+  created_at timestamptz default now(),
+  unique(activity_id, user_id, emoji)
+);
+alter table public.reactions enable row level security;
+create policy "Reactions are viewable" on public.reactions for select using (true);
+create policy "Users can react" on public.reactions
+  for insert with check (auth.uid() = user_id);
+create policy "Users can remove own reaction" on public.reactions
+  for delete using (auth.uid() = user_id);
+
+-- Push notification subscriptions
+create table public.push_subscriptions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz default now(),
+  unique(user_id, endpoint)
+);
+alter table public.push_subscriptions enable row level security;
+create policy "Users can manage own push subscriptions" on public.push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Admin content flags
+create table public.admin_flags (
+  id uuid default gen_random_uuid() primary key,
+  reporter_id uuid references public.profiles(id) on delete cascade not null,
+  content_type text not null check (content_type in ('activity','comment','profile')),
+  content_id uuid not null,
+  reason text not null,
+  status text default 'open' check (status in ('open','reviewed','dismissed')),
+  created_at timestamptz default now()
+);
+alter table public.admin_flags enable row level security;
+create policy "Admins can view flags" on public.admin_flags
+  for select using (auth.uid() = reporter_id);
+create policy "Users can submit flags" on public.admin_flags
+  for insert with check (auth.uid() = reporter_id);
+
+-- Phase 7 migration only (existing DB):
+-- alter table public.activities add column if not exists avg_heart_rate int;
+-- alter table public.activities add column if not exists max_heart_rate int;
+-- create table if not exists public.events ( ... see above ... );
+-- create table if not exists public.event_participants ( ... see above ... );
+-- create table if not exists public.stories ( ... see above ... );
+-- create table if not exists public.reactions ( ... see above ... );
+-- create table if not exists public.push_subscriptions ( ... see above ... );
+-- create table if not exists public.admin_flags ( ... see above ... );
+

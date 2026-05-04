@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ToastProvider'
 import { Settings, Ruler, Bell, LogOut, Moon } from 'lucide-react'
+import { PushNotificationToggle } from '@/components/PushNotificationToggle'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
@@ -143,7 +144,11 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
-        <p className="text-xs text-gray-400 mt-3">Full notification preferences coming soon.</p>
+        <div className="mt-4 pt-4 border-t" style={{ borderColor: 'var(--surface-border)' }}>
+          <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Push Notifications</p>
+          <PushNotificationToggle />
+          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>Requires NEXT_PUBLIC_VAPID_PUBLIC_KEY in .env.local</p>
+        </div>
       </div>
 
       {/* Account */}
