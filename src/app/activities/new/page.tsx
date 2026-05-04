@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ToastProvider'
 import { uploadActivityPhoto } from '@/lib/utils'
+import { checkAndAwardAchievements } from '@/lib/achievements'
 import type { ActivityType, GpxPoint } from '@/lib/types'
 
 const ACTIVITY_TYPES: { value: ActivityType; label: string; icon: string }[] = [
@@ -62,8 +63,8 @@ export default function NewActivityPage() {
   const [isPublic, setIsPublic] = useState(true)
   const [gpxData, setGpxData] = useState<GpxPoint[]>([])
   const [gpxFileName, setGpxFileName] = useState('')
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -90,11 +91,14 @@ export default function NewActivityPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Not signed in'); setLoading(false); return }
 
-    // Upload photo first (non-blocking failure)
-    let photoUrl: string | null = null
-    if (photoFile) {
-      photoUrl = await uploadActivityPhoto(supabase, photoFile, user.id)
-    }
+    // Upload all photos (non-blocking, parallel)
+    const photoUrls: string[] = []
+    await Promise.all(
+      photoFiles.map(async (file) => {
+        const url = await uploadActivityPhoto(supabase, file, user.id)
+        if (url) photoUrls.push(url)
+      })
+    )
 
     const distanceM = parseFloat(distanceKm) * 1000
     const durationS = parseInt(durationMin || '0') * 60 + parseInt(durationSec || '0')
@@ -116,14 +120,38 @@ export default function NewActivityPage() {
       gpx_data: gpxData.length > 0 ? gpxData : null,
       start_latlng: gpxData.length > 0 ? [gpxData[0].lat, gpxData[0].lng] : null,
       is_public: isPublic,
-      photo_url: photoUrl,
+      photo_url: photoUrls[0] ?? null,
     })
 
     if (insertError) {
       setError(insertError.message)
       setLoading(false)
     } else {
-      toast('Activity saved!', 'success')
+      // Upload additional photos to activity_photos table
+      const { data: inserted } = await supabase
+        .from('activities')
+        .select('id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (inserted && photoUrls.length > 0) {
+        await supabase.from('activity_photos').insert(
+          photoUrls.map((url, i) => ({ activity_id: inserted.id, user_id: user.id, url, position: i }))
+        )
+      }
+      // Check for newly earned achievements
+      const { data: allActivities } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('user_id', user.id)
+      const newBadges = await checkAndAwardAchievements(supabase, user.id, allActivities ?? [])
+      if (newBadges.length > 0) {
+        // Brief delay so the activity list is consistent before navigating
+        newBadges.forEach((b) => toast(`🏅 Achievement unlocked: ${b.name}!`, 'success'))
+      } else {
+        toast('Activity saved!', 'success')
+      }
       router.push('/activities')
     }
   }
@@ -241,40 +269,55 @@ export default function NewActivityPage() {
           </label>
         </div>
 
-        {/* Photo Upload */}
+        {/* Photo Upload (up to 5) */}
         <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
           <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-            Activity Photo <span className="text-gray-400 font-normal">(optional)</span>
+            Photos <span className="text-gray-400 font-normal">(optional, up to 5)</span>
           </label>
-          {photoPreview ? (
-            <div className="relative rounded-xl overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover" />
-              <button
-                type="button"
-                onClick={() => { setPhotoFile(null); setPhotoPreview(null) }}
-                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white text-xs font-medium px-2.5 py-1 rounded-lg transition-colors"
-              >
-                Remove
-              </button>
+
+          {/* Previews grid */}
+          {photoPreviews.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {photoPreviews.map((src, i) => (
+                <div key={i} className="relative aspect-square rounded-xl overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoFiles((f) => f.filter((_, j) => j !== i))
+                      setPhotoPreviews((p) => p.filter((_, j) => j !== i))
+                    }}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center text-xs transition-colors"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
-          ) : (
-            <label className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-dashed border-purple-200 rounded-xl px-4 py-5 cursor-pointer hover:border-purple-400 transition-all group">
+          )}
+
+          {photoPreviews.length < 5 && (
+            <label className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-dashed border-purple-200 rounded-xl px-4 py-4 cursor-pointer hover:border-purple-400 transition-all group">
               <span className="text-3xl">📷</span>
               <div>
                 <div className="text-sm font-semibold text-gray-700 group-hover:text-purple-600 transition-colors">
-                  Click to upload a photo
+                  {photoPreviews.length === 0 ? 'Click to upload photos' : 'Add more photos'}
                 </div>
-                <div className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP — max 5 MB</div>
+                <div className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP — max 5 MB each · {5 - photoPreviews.length} remaining</div>
               </div>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
                 onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  setPhotoFile(file)
-                  setPhotoPreview(URL.createObjectURL(file))
+                  const files = Array.from(e.target.files ?? []).slice(0, 5 - photoFiles.length)
+                  setPhotoFiles((prev) => [...prev, ...files])
+                  files.forEach((f) => {
+                    const url = URL.createObjectURL(f)
+                    setPhotoPreviews((prev) => [...prev, url])
+                  })
+                  e.target.value = ''
                 }}
                 className="hidden"
               />

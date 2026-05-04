@@ -170,3 +170,40 @@ create policy "Users can manage own goals" on public.goals
 -- Phase 3 migration only (existing DB):
 -- create table if not exists public.goals ( ... see above ... );
 
+-- ─── Phase 4: Achievements, Multi-photos, Settings ────────────────────────
+
+-- User achievements (earned milestones)
+create table public.user_achievements (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  achievement_id text not null,
+  activity_id uuid references public.activities(id) on delete set null,
+  earned_at timestamptz default now(),
+  unique(user_id, achievement_id)
+);
+alter table public.user_achievements enable row level security;
+create policy "Achievements are public" on public.user_achievements for select using (true);
+create policy "Users can earn own achievements" on public.user_achievements
+  for insert with check (auth.uid() = user_id);
+
+-- Activity photos (gallery - multiple per activity)
+create table public.activity_photos (
+  id uuid default gen_random_uuid() primary key,
+  activity_id uuid references public.activities(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  url text not null,
+  position int default 0,
+  created_at timestamptz default now()
+);
+alter table public.activity_photos enable row level security;
+create policy "Activity photos are viewable" on public.activity_photos for select using (true);
+create policy "Users can add photos to own activities" on public.activity_photos
+  for insert with check (auth.uid() = user_id);
+create policy "Users can delete own photos" on public.activity_photos
+  for delete using (auth.uid() = user_id);
+
+-- Phase 4 migration only (existing DB):
+-- alter table public.profiles add column if not exists unit_system text default 'metric' check (unit_system in ('metric', 'imperial'));
+-- create table if not exists public.user_achievements ( ... see above ... );
+-- create table if not exists public.activity_photos ( ... see above ... );
+

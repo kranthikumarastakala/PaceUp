@@ -6,9 +6,31 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDistance(meters: number): string {
+export function formatDistance(meters: number, imperial = false): string {
+  if (imperial) {
+    const miles = meters / 1609.344
+    return miles >= 1 ? `${miles.toFixed(2)} mi` : `${Math.round(meters * 3.281)} ft`
+  }
   if (meters >= 1000) return `${(meters / 1000).toFixed(2)} km`
   return `${Math.round(meters)} m`
+}
+
+export function formatElevation(meters: number, imperial = false): string {
+  if (imperial) return `${Math.round(meters * 3.281)} ft`
+  return `${Math.round(meters)} m`
+}
+
+export function formatPace(secondsPerKm: number, imperial = false): string {
+  if (!secondsPerKm) return '--'
+  const spUnit = imperial ? secondsPerKm * 1.60934 : secondsPerKm
+  const m = Math.floor(spUnit / 60)
+  const s = Math.round(spUnit % 60)
+  return `${m}:${String(s).padStart(2, '0')} /${imperial ? 'mi' : 'km'}`
+}
+
+export function formatSpeed(kmh: number, imperial = false): string {
+  if (imperial) return `${(kmh * 0.621371).toFixed(1)} mph`
+  return `${kmh.toFixed(1)} km/h`
 }
 
 export function formatDuration(seconds: number): string {
@@ -19,20 +41,6 @@ export function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function formatPace(secondsPerKm: number): string {
-  if (!secondsPerKm) return '--'
-  const m = Math.floor(secondsPerKm / 60)
-  const s = Math.round(secondsPerKm % 60)
-  return `${m}:${String(s).padStart(2, '0')} /km`
-}
-
-export function formatSpeed(kmh: number): string {
-  return `${kmh.toFixed(1)} km/h`
-}
-
-export function formatElevation(meters: number): string {
-  return `${Math.round(meters)} m`
-}
 
 export function activityIcon(type: ActivityType): string {
   const icons: Record<ActivityType, string> = {

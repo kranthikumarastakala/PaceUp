@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActivityCard } from '@/components/ActivityCard'
-import type { Activity, Profile } from '@/lib/types'
+import { AchievementBadges } from '@/components/AchievementBadges'
+import type { Activity, Profile, Achievement } from '@/lib/types'
 import { MapPin, Calendar, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -11,6 +12,7 @@ import Link from 'next/link'
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
+  const [achievements, setAchievements] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -19,14 +21,16 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/login'; return }
 
-      const [{ data: prof }, { data: acts }] = await Promise.all([
+      const [{ data: prof }, { data: acts }, { data: earned }] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
         supabase.from('activities').select('*, profiles(username, full_name, avatar_url)')
           .eq('user_id', user.id).order('created_at', { ascending: false }).limit(10),
+        supabase.from('user_achievements').select('*').eq('user_id', user.id),
       ])
 
       setProfile(prof as Profile)
       setActivities((acts as Activity[]) ?? [])
+      setAchievements((earned as Achievement[]) ?? [])
       setLoading(false)
     }
     load()
@@ -92,6 +96,17 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Achievements */}
+      {achievements.length > 0 && (
+        <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+          <h2 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+            🏅 Achievements
+            <span className="ml-auto text-xs font-medium text-gray-400">{achievements.length} earned</span>
+          </h2>
+          <AchievementBadges earned={achievements} />
+        </div>
+      )}
 
       {/* Recent activities */}
       <div>

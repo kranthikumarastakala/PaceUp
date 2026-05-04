@@ -6,8 +6,9 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { RouteMap } from '@/components/RouteMap'
 import { ElevationChart } from '@/components/ElevationChart'
+import { PhotoCarousel } from '@/components/PhotoCarousel'
 import { useToast } from '@/components/ToastProvider'
-import type { Activity } from '@/lib/types'
+import type { Activity, ActivityPhoto } from '@/lib/types'
 import {
   formatDistance, formatDuration, formatPace, formatSpeed,
   formatElevation, activityIcon, activityColor, timeAgo
@@ -19,6 +20,7 @@ export default function ActivityDetailPage() {
   const params = useParams()
   const router = useRouter()
   const [activity, setActivity] = useState<Activity | null>(null)
+  const [extraPhotos, setExtraPhotos] = useState<ActivityPhoto[]>([])
   const [loading, setLoading] = useState(true)
   const [kudos, setKudos] = useState(0)
   const [liked, setLiked] = useState(false)
@@ -30,18 +32,24 @@ export default function ActivityDetailPage() {
 
   useEffect(() => {
     const load = async () => {
-      const [{ data: activityData }, { data: { user } }] = await Promise.all([
+      const [{ data: activityData }, { data: { user } }, { data: photos }] = await Promise.all([
         supabase
           .from('activities')
           .select('*, profiles(username, full_name, avatar_url)')
           .eq('id', params.id)
           .single(),
         supabase.auth.getUser(),
+        supabase
+          .from('activity_photos')
+          .select('*')
+          .eq('activity_id', params.id)
+          .order('position'),
       ])
       if (activityData) {
         setActivity(activityData as Activity)
         setKudos(activityData.kudos_count ?? 0)
       }
+      setExtraPhotos((photos as ActivityPhoto[]) ?? [])
       setCurrentUserId(user?.id ?? null)
       setLoading(false)
     }
@@ -143,13 +151,14 @@ export default function ActivityDetailPage() {
         <RouteMap points={activity.gpx_data} height="350px" />
       )}
 
-      {/* Activity photo */}
-      {activity.photo_url && (
-        <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={activity.photo_url} alt={activity.title} className="w-full max-h-96 object-cover" />
-        </div>
-      )}
+      {/* Photos */}
+      {(() => {
+        const allPhotos = [
+          ...(activity.photo_url ? [activity.photo_url] : []),
+          ...extraPhotos.filter((p) => p.url !== activity.photo_url).map((p) => p.url),
+        ]
+        return allPhotos.length > 0 ? <PhotoCarousel photos={allPhotos} alt={activity.title} /> : null
+      })()}
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

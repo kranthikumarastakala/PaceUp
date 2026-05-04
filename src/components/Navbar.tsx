@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Activity, Home, User, PlusCircle, BarChart2, LogOut, Menu, X, Search, Target, Trophy } from 'lucide-react'
+import { Activity, Home, User, PlusCircle, BarChart2, LogOut, Menu, X, Search, Target, Trophy, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
@@ -16,6 +16,7 @@ const navLinks = [
   { href: '/goals', label: 'Goals', icon: Target },
   { href: '/leaderboard', label: 'Leaderboard', icon: Trophy },
   { href: '/profile', label: 'Profile', icon: User },
+  { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export function Navbar() {

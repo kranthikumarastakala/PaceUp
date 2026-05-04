@@ -20,6 +20,24 @@ export interface Profile {
   avatar_url: string
   bio: string
   location: string
+  unit_system: 'metric' | 'imperial'
+  created_at: string
+}
+
+export interface Achievement {
+  id: string
+  user_id: string
+  achievement_id: string
+  activity_id: string | null
+  earned_at: string
+}
+
+export interface ActivityPhoto {
+  id: string
+  activity_id: string
+  user_id: string
+  url: string
+  position: number
   created_at: string
 }
 
@@ -42,6 +60,7 @@ export interface Activity {
   photo_url: string | null
   created_at: string
   profiles?: Profile
+  activity_photos?: ActivityPhoto[]
 }
 
 export interface GpxPoint {
