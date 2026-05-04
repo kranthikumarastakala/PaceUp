@@ -99,3 +99,55 @@ export interface Notification {
   actor?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
   activity?: Pick<Activity, 'title'>
 }
+
+// ─── Phase 5 ──────────────────────────────────────────────────────────────
+
+export interface Message {
+  id: string
+  sender_id: string
+  recipient_id: string
+  body: string
+  is_read: boolean
+  created_at: string
+  sender?: Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url'>
+  recipient?: Pick<Profile, 'id' | 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface Route {
+  id: string
+  user_id: string
+  name: string
+  description: string | null
+  activity_type: ActivityType
+  gpx_data: GpxPoint[] | null
+  distance: number | null
+  elevation_gain: number | null
+  is_public: boolean
+  star_count: number
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export interface TrainingPlan {
+  id: string
+  user_id: string
+  title: string
+  description: string | null
+  duration_weeks: number
+  activity_type: ActivityType | 'all'
+  is_public: boolean
+  created_at: string
+  profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+  days?: TrainingPlanDay[]
+}
+
+export interface TrainingPlanDay {
+  id: string
+  plan_id: string
+  week: number
+  day_of_week: number   // 0=Mon … 6=Sun
+  activity_type: ActivityType | 'rest'
+  target_distance: number | null  // meters
+  target_duration: number | null  // seconds
+  notes: string | null
+}

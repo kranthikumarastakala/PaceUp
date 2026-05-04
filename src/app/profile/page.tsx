@@ -45,9 +45,13 @@ export default function ProfilePage() {
       {/* Profile card */}
       <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-md">
         <div className="flex items-start gap-5">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-3xl font-bold shrink-0 shadow-lg shadow-orange-200 text-white">
-            {profile?.full_name?.[0] ?? profile?.username?.[0] ?? '?'}
-          </div>
+          {profile?.avatar_url ? (
+            <img src={profile.avatar_url} alt="avatar" className="w-20 h-20 rounded-2xl object-cover shrink-0 shadow-lg shadow-orange-200" />
+          ) : (
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-3xl font-bold shrink-0 shadow-lg shadow-orange-200 text-white">
+              {profile?.full_name?.[0] ?? profile?.username?.[0] ?? '?'}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div>

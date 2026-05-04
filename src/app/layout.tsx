@@ -9,6 +9,13 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "PaceUp — Track. Share. Improve.",
   description: "A better way to track your fitness activities",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "PaceUp",
+  },
+  formatDetection: { telephone: false },
 };
 
 export default function RootLayout({

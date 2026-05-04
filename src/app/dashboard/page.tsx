@@ -6,8 +6,9 @@ import { ActivityCard } from '@/components/ActivityCard'
 import type { Activity } from '@/lib/types'
 import Link from 'next/link'
 import { formatDistance, formatDuration } from '@/lib/utils'
-import { startOfWeek } from 'date-fns'
-import { Loader2 } from 'lucide-react'
+import { startOfWeek, subDays } from 'date-fns'
+import { Loader2, TrendingUp, UserPlus } from 'lucide-react'
+import type { Profile } from '@/lib/types'
 
 const PAGE_SIZE = 20
 
@@ -20,6 +21,8 @@ export default function DashboardPage() {
   const [hasMore, setHasMore] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
   const [followIds, setFollowIds] = useState<string[]>([])
+  const [trending, setTrending] = useState<Activity[]>([])
+  const [suggested, setSuggested] = useState<Profile[]>([])
   const sentinelRef = useRef<HTMLDivElement>(null)
   const feedRef = useRef(feed)
   feedRef.current = feed
@@ -63,8 +66,39 @@ export default function DashboardPage() {
         supabase.from('follows').select('following_id').eq('follower_id', user.id),
       ])
       setWeeklyActivities((weekly as Activity[]) ?? [])
-      const fids = (follows ?? []).map((f: any) => f.following_id as string)
+      const fids = (follows ?? []).map((f: { following_id: string }) => f.following_id)
       setFollowIds(fids)
+
+      // Trending: most kudos in last 7 days
+      const since7d = subDays(new Date(), 7).toISOString()
+      const { data: trendData } = await supabase
+        .from('activities')
+        .select('*, profiles(username,full_name,avatar_url)')
+        .eq('is_public', true)
+        .gte('created_at', since7d)
+        .order('kudos_count', { ascending: false })
+        .limit(3)
+      setTrending((trendData as Activity[]) ?? [])
+
+      // Suggested: profiles that your follows follow (FOF), excluding yourself + already-following
+      if (fids.length > 0) {
+        const { data: fofData } = await supabase
+          .from('follows')
+          .select('following_id, profiles!follows_following_id_fkey(id,username,full_name,avatar_url)')
+          .in('follower_id', fids)
+          .neq('following_id', user.id)
+          .not('following_id', 'in', `(${[...fids, user.id].join(',')})`)
+          .limit(5)
+        const seen = new Set<string>()
+        const sugg: Profile[] = []
+        for (const row of (fofData ?? []) as unknown as { following_id: string; profiles: Profile }[]) {
+          if (!seen.has(row.following_id)) {
+            seen.add(row.following_id)
+            sugg.push(row.profiles)
+          }
+        }
+        setSuggested(sugg)
+      }
 
       const first = await fetchFeedPage('all', user.id, fids, 0)
       setActivities(first)
@@ -132,6 +166,66 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Trending this week */}
+      {trending.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={16} className="text-orange-500" />
+            <h2 className="text-sm font-semibold text-gray-700">Trending This Week</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {trending.map((act) => (
+              <Link
+                key={act.id}
+                href={`/activities/${act.id}`}
+                className="bg-white border border-gray-100 rounded-2xl p-3 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">
+                    {act.type === 'run' ? '🏃' : act.type === 'ride' ? '🚴' : act.type === 'swim' ? '🏊' : act.type === 'walk' ? '🚶' : act.type === 'hike' ? '🥾' : '💪'}
+                  </span>
+                  <p className="font-medium text-gray-900 text-sm truncate">{act.title}</p>
+                </div>
+                <p className="text-xs text-gray-400 truncate">@{act.profiles?.username}</p>
+                <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                  {act.distance > 0 && <span>{formatDistance(act.distance)}</span>}
+                  <span className="ml-auto">❤️ {act.kudos_count}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Suggested users */}
+      {suggested.length > 0 && (
+        <div className="mb-6 bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <UserPlus size={16} className="text-orange-500" />
+            <h2 className="text-sm font-semibold text-gray-700">People You May Know</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {suggested.map((p) => (
+              <Link
+                key={p.id}
+                href={`/profile/${p.username}`}
+                className="flex flex-col items-center gap-1.5 shrink-0 w-20 text-center"
+              >
+                {p.avatar_url ? (
+                  <img src={p.avatar_url} alt="" className="w-12 h-12 rounded-xl object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white font-bold text-lg">
+                    {p.full_name?.[0] ?? p.username?.[0]}
+                  </div>
+                )}
+                <p className="text-xs font-medium text-gray-800 leading-tight truncate w-full">{p.full_name || p.username}</p>
+                <p className="text-xs text-gray-400 truncate w-full">@{p.username}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Feed header + toggle */}
       <div className="flex items-center justify-between mb-4">

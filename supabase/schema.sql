@@ -207,3 +207,114 @@ create policy "Users can delete own photos" on public.activity_photos
 -- create table if not exists public.user_achievements ( ... see above ... );
 -- create table if not exists public.activity_photos ( ... see above ... );
 
+-- ─── Phase 5: DMs, Routes, Training Plans ──────────────────────────────────
+
+-- Direct messages
+create table public.messages (
+  id uuid default gen_random_uuid() primary key,
+  sender_id uuid references public.profiles(id) on delete cascade not null,
+  recipient_id uuid references public.profiles(id) on delete cascade not null,
+  body text not null check (char_length(body) >= 1 and char_length(body) <= 2000),
+  is_read boolean default false,
+  created_at timestamptz default now()
+);
+alter table public.messages enable row level security;
+create policy "Users can see own messages" on public.messages
+  for select using (auth.uid() = sender_id or auth.uid() = recipient_id);
+create policy "Users can send messages" on public.messages
+  for insert with check (auth.uid() = sender_id);
+create policy "Recipients can mark messages read" on public.messages
+  for update using (auth.uid() = recipient_id);
+
+-- Shared routes
+create table public.routes (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  name text not null,
+  description text,
+  activity_type text check (activity_type in ('run','ride','walk','hike')) default 'run',
+  gpx_data jsonb,
+  distance float,
+  elevation_gain float,
+  is_public boolean default true,
+  star_count int default 0,
+  created_at timestamptz default now()
+);
+alter table public.routes enable row level security;
+create policy "Public routes are viewable" on public.routes
+  for select using (is_public = true or auth.uid() = user_id);
+create policy "Users can create routes" on public.routes
+  for insert with check (auth.uid() = user_id);
+create policy "Users can update own routes" on public.routes
+  for update using (auth.uid() = user_id);
+create policy "Users can delete own routes" on public.routes
+  for delete using (auth.uid() = user_id);
+
+-- Route stars (bookmarks)
+create table public.route_stars (
+  route_id uuid references public.routes(id) on delete cascade not null,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  created_at timestamptz default now(),
+  primary key (route_id, user_id)
+);
+alter table public.route_stars enable row level security;
+create policy "Route stars are public" on public.route_stars for select using (true);
+create policy "Users can star routes" on public.route_stars for insert with check (auth.uid() = user_id);
+create policy "Users can unstar routes" on public.route_stars for delete using (auth.uid() = user_id);
+
+-- Training plans
+create table public.training_plans (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  title text not null,
+  description text,
+  duration_weeks int not null default 4,
+  activity_type text check (activity_type in ('run','ride','swim','walk','hike','workout','all')) default 'run',
+  is_public boolean default true,
+  created_at timestamptz default now()
+);
+alter table public.training_plans enable row level security;
+create policy "Public training plans are viewable" on public.training_plans
+  for select using (is_public = true or auth.uid() = user_id);
+create policy "Users can create own plans" on public.training_plans
+  for insert with check (auth.uid() = user_id);
+create policy "Users can update own plans" on public.training_plans
+  for update using (auth.uid() = user_id);
+create policy "Users can delete own plans" on public.training_plans
+  for delete using (auth.uid() = user_id);
+
+-- Training plan days
+create table public.training_plan_days (
+  id uuid default gen_random_uuid() primary key,
+  plan_id uuid references public.training_plans(id) on delete cascade not null,
+  week int not null,
+  day_of_week int not null check (day_of_week between 0 and 6),
+  activity_type text check (activity_type in ('run','ride','swim','walk','hike','workout','rest')) default 'run',
+  target_distance float,
+  target_duration int,
+  notes text,
+  created_at timestamptz default now()
+);
+alter table public.training_plan_days enable row level security;
+create policy "Plan days viewable with plan" on public.training_plan_days
+  for select using (
+    exists (
+      select 1 from public.training_plans p
+      where p.id = plan_id and (p.is_public = true or p.user_id = auth.uid())
+    )
+  );
+create policy "Plan owner can manage days" on public.training_plan_days
+  for all using (
+    exists (select 1 from public.training_plans p where p.id = plan_id and p.user_id = auth.uid())
+  ) with check (
+    exists (select 1 from public.training_plans p where p.id = plan_id and p.user_id = auth.uid())
+  );
+
+-- Phase 5 migration only (existing DB):
+-- create table if not exists public.messages ( ... see above ... );
+-- create table if not exists public.routes ( ... see above ... );
+-- create table if not exists public.route_stars ( ... see above ... );
+-- create table if not exists public.training_plans ( ... see above ... );
+-- create table if not exists public.training_plan_days ( ... see above ... );
+-- Enable Realtime for messages: alter publication supabase_realtime add table public.messages;
+

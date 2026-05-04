@@ -97,3 +97,50 @@ export async function uploadActivityPhoto(
   return urlData.publicUrl
 }
 
+export function parseGpxFile(text: string): {
+  points: import('./types').GpxPoint[]
+  distance: number
+  elevation: number
+  duration: number
+  startTime: string
+} {
+  const parser = new DOMParser()
+  const xml = parser.parseFromString(text, 'application/xml')
+  const trkpts = Array.from(xml.querySelectorAll('trkpt'))
+
+  const points: import('./types').GpxPoint[] = trkpts.map((pt) => ({
+    lat: parseFloat(pt.getAttribute('lat') ?? '0'),
+    lng: parseFloat(pt.getAttribute('lon') ?? '0'),
+    ele: parseFloat(pt.querySelector('ele')?.textContent ?? '0'),
+    time: pt.querySelector('time')?.textContent ?? '',
+  }))
+
+  let distance = 0
+  let elevation = 0
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1]
+    const curr = points[i]
+    const R = 6371000
+    const dLat = ((curr.lat - prev.lat) * Math.PI) / 180
+    const dLng = ((curr.lng - prev.lng) * Math.PI) / 180
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos((prev.lat * Math.PI) / 180) *
+        Math.cos((curr.lat * Math.PI) / 180) *
+        Math.sin(dLng / 2) ** 2
+    distance += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    if (curr.ele > prev.ele) elevation += curr.ele - prev.ele
+  }
+
+  const startTime = points[0]?.time ?? ''
+  const endTime = points[points.length - 1]?.time ?? ''
+  const duration =
+    startTime && endTime
+      ? Math.round(
+          (new Date(endTime).getTime() - new Date(startTime).getTime()) / 1000
+        )
+      : 0
+
+  return { points, distance, elevation, duration, startTime }
+}
+
