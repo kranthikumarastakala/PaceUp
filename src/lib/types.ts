@@ -1,4 +1,17 @@
 export type ActivityType = 'run' | 'ride' | 'swim' | 'walk' | 'hike' | 'workout'
+export type GoalPeriod = 'weekly' | 'monthly' | 'yearly'
+export type GoalMetric = 'distance' | 'duration' | 'elevation' | 'activities'
+
+export interface Goal {
+  id: string
+  user_id: string
+  type: GoalMetric
+  period: GoalPeriod
+  activity_type: ActivityType | 'all'
+  target_value: number
+  is_active: boolean
+  created_at: string
+}
 
 export interface Profile {
   id: string

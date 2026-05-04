@@ -1,32 +1,65 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActivityCard } from '@/components/ActivityCard'
 import type { Activity } from '@/lib/types'
 import Link from 'next/link'
+import { Loader2 } from 'lucide-react'
+
+const PAGE_SIZE = 15
 
 export default function ActivitiesPage() {
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
   const supabase = createClient()
 
+  const fetchPage = useCallback(async (uid: string, from: number) => {
+    const { data } = await supabase
+      .from('activities')
+      .select('*, profiles(username, full_name, avatar_url)')
+      .eq('user_id', uid)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+    return (data as Activity[]) ?? []
+  }, [])
+
   useEffect(() => {
-    const load = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { window.location.href = '/login'; return }
-
-      const { data } = await supabase
-        .from('activities')
-        .select('*, profiles(username, full_name, avatar_url)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-
-      setActivities((data as Activity[]) ?? [])
+      setUserId(user.id)
+      const first = await fetchPage(user.id, 0)
+      setActivities(first)
+      setHasMore(first.length === PAGE_SIZE)
       setLoading(false)
     }
-    load()
+    init()
   }, [])
+
+  // IntersectionObserver-based sentinel
+  useEffect(() => {
+    if (!hasMore || loadingMore || loading) return
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      async ([entry]) => {
+        if (!entry.isIntersecting || !userId) return
+        setLoadingMore(true)
+        const next = await fetchPage(userId, activities.length)
+        setActivities((prev) => [...prev, ...next])
+        setHasMore(next.length === PAGE_SIZE)
+        setLoadingMore(false)
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, loading, userId, activities.length, fetchPage])
 
   const totalDistance = activities.reduce((sum, a) => sum + (a.distance ?? 0), 0)
   const totalTime = activities.reduce((sum, a) => sum + (a.duration ?? 0), 0)
@@ -69,7 +102,7 @@ export default function ActivitiesPage() {
       ) : activities.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
           <div className="text-5xl mb-4">🏃</div>
-          <p className="text-lg font-medium text-gray-400">No activities yet</p>
+          <p className="text-lg font-medium">No activities yet</p>
           <Link
             href="/activities/new"
             className="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors"
@@ -78,14 +111,23 @@ export default function ActivitiesPage() {
           </Link>
         </div>
       ) : (
-        <div className="space-y-4">
-          {activities.map((activity) => (
-            <ActivityCard key={activity.id} activity={activity} />
-          ))}
-        </div>
+        <>
+          <div className="space-y-4">
+            {activities.map((activity) => (
+              <ActivityCard key={activity.id} activity={activity} />
+            ))}
+          </div>
+
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="h-10 flex items-center justify-center mt-4">
+            {loadingMore && <Loader2 size={20} className="animate-spin text-orange-400" />}
+            {!hasMore && activities.length > 0 && (
+              <p className="text-xs text-gray-400">All {activities.length} activities loaded</p>
+            )}
+          </div>
+        </>
       )}
     </div>
   )
 }
-
 

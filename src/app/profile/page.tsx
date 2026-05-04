@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActivityCard } from '@/components/ActivityCard'
 import type { Activity, Profile } from '@/lib/types'
-import { MapPin, Calendar } from 'lucide-react'
+import { MapPin, Calendar, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
+import Link from 'next/link'
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -44,8 +45,19 @@ export default function ProfilePage() {
             {profile?.full_name?.[0] ?? profile?.username?.[0] ?? '?'}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-extrabold text-gray-900">{profile?.full_name}</h1>
-            <p className="text-orange-500 font-medium">@{profile?.username}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h1 className="text-2xl font-extrabold text-gray-900">{profile?.full_name}</h1>
+                <p className="text-orange-500 font-medium">@{profile?.username}</p>
+              </div>
+              <Link
+                href="/profile/edit"
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+              >
+                <Pencil size={13} />
+                Edit
+              </Link>
+            </div>
             {profile?.bio && <p className="text-gray-600 text-sm mt-2">{profile.bio}</p>}
             <div className="flex items-center gap-4 mt-3 text-sm text-gray-400">
               {profile?.location && (

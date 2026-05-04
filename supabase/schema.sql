@@ -150,3 +150,23 @@ create trigger on_auth_user_created
 
 -- Storage bucket (Supabase dashboard -> Storage -> New bucket)
 -- Name: activity-photos | Public: true | Max size: 5 MB
+
+-- ─── Phase 3: Goals & Challenges ─────────────────────────────────────────
+create table public.goals (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.profiles(id) on delete cascade not null,
+  type text not null check (type in ('distance', 'duration', 'elevation', 'activities')),
+  period text not null check (period in ('weekly', 'monthly', 'yearly')),
+  activity_type text check (activity_type in ('run','ride','swim','walk','hike','workout','all')) default 'all',
+  target_value float not null,      -- meters / seconds / meters / count
+  is_active boolean default true,
+  created_at timestamptz default now()
+);
+
+alter table public.goals enable row level security;
+create policy "Users can manage own goals" on public.goals
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Phase 3 migration only (existing DB):
+-- create table if not exists public.goals ( ... see above ... );
+
