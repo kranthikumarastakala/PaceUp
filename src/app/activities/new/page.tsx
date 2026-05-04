@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ToastProvider'
+import { uploadActivityPhoto } from '@/lib/utils'
 import type { ActivityType, GpxPoint } from '@/lib/types'
 
 const ACTIVITY_TYPES: { value: ActivityType; label: string; icon: string }[] = [
@@ -61,6 +62,8 @@ export default function NewActivityPage() {
   const [isPublic, setIsPublic] = useState(true)
   const [gpxData, setGpxData] = useState<GpxPoint[]>([])
   const [gpxFileName, setGpxFileName] = useState('')
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -87,6 +90,12 @@ export default function NewActivityPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setError('Not signed in'); setLoading(false); return }
 
+    // Upload photo first (non-blocking failure)
+    let photoUrl: string | null = null
+    if (photoFile) {
+      photoUrl = await uploadActivityPhoto(supabase, photoFile, user.id)
+    }
+
     const distanceM = parseFloat(distanceKm) * 1000
     const durationS = parseInt(durationMin || '0') * 60 + parseInt(durationSec || '0')
     const avgPace = distanceM > 0 && durationS > 0 ? durationS / (distanceM / 1000) : 0
@@ -107,6 +116,7 @@ export default function NewActivityPage() {
       gpx_data: gpxData.length > 0 ? gpxData : null,
       start_latlng: gpxData.length > 0 ? [gpxData[0].lat, gpxData[0].lng] : null,
       is_public: isPublic,
+      photo_url: photoUrl,
     })
 
     if (insertError) {
@@ -229,6 +239,47 @@ export default function NewActivityPage() {
             </div>
             <input type="file" accept=".gpx" onChange={handleGpxUpload} className="hidden" />
           </label>
+        </div>
+
+        {/* Photo Upload */}
+        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            Activity Photo <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          {photoPreview ? (
+            <div className="relative rounded-xl overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoPreview} alt="Preview" className="w-full h-48 object-cover" />
+              <button
+                type="button"
+                onClick={() => { setPhotoFile(null); setPhotoPreview(null) }}
+                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white text-xs font-medium px-2.5 py-1 rounded-lg transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-dashed border-purple-200 rounded-xl px-4 py-5 cursor-pointer hover:border-purple-400 transition-all group">
+              <span className="text-3xl">📷</span>
+              <div>
+                <div className="text-sm font-semibold text-gray-700 group-hover:text-purple-600 transition-colors">
+                  Click to upload a photo
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP — max 5 MB</div>
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setPhotoFile(file)
+                  setPhotoPreview(URL.createObjectURL(file))
+                }}
+                className="hidden"
+              />
+            </label>
+          )}
         </div>
 
         {/* Description */}

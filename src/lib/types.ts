@@ -26,6 +26,7 @@ export interface Activity {
   description: string
   is_public: boolean
   kudos_count: number
+  photo_url: string | null
   created_at: string
   profiles?: Profile
 }
@@ -51,4 +52,18 @@ export interface Comment {
   body: string
   created_at: string
   profiles?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+}
+
+export type NotificationType = 'kudos' | 'follow' | 'comment'
+
+export interface Notification {
+  id: string
+  user_id: string      // recipient
+  actor_id: string     // who triggered it
+  type: NotificationType
+  activity_id: string | null
+  is_read: boolean
+  created_at: string
+  actor?: Pick<Profile, 'username' | 'full_name' | 'avatar_url'>
+  activity?: Pick<Activity, 'title'>
 }

@@ -1,14 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { Activity } from '@/lib/types'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, Legend
+  CartesianGrid,
 } from 'recharts'
-import { formatDistance, formatDuration, activityIcon } from '@/lib/utils'
+import { formatDistance, formatDuration, formatPace, formatSpeed, activityIcon } from '@/lib/utils'
 import { format, startOfWeek, addDays } from 'date-fns'
+import { Trophy } from 'lucide-react'
 
 export default function StatsPage() {
   const [activities, setActivities] = useState<Activity[]>([])
@@ -58,6 +60,41 @@ export default function StatsPage() {
   const totalTime = activities.reduce((s, a) => s + (a.duration ?? 0), 0)
   const totalElev = activities.reduce((s, a) => s + (a.elevation_gain ?? 0), 0)
   const totalCals = activities.reduce((s, a) => s + (a.calories ?? 0), 0)
+
+  // ── Personal Records ──────────────────────────────────────────────────────
+  const RUN_MILESTONES = [
+    { label: '1 Mile',          distance: 1609  },
+    { label: '5K',              distance: 5000  },
+    { label: '10K',             distance: 10000 },
+    { label: 'Half Marathon',   distance: 21097 },
+    { label: 'Marathon',        distance: 42195 },
+  ]
+  const RIDE_MILESTONES = [
+    { label: '20K',  distance: 20000  },
+    { label: '40K',  distance: 40000  },
+    { label: '100K', distance: 100000 },
+  ]
+
+  const personalRecords = useMemo(() => {
+    const runs  = activities.filter((a) => a.type === 'run'  && a.distance > 0 && a.avg_pace  > 0)
+    const rides = activities.filter((a) => a.type === 'ride' && a.distance > 0 && a.avg_speed > 0)
+
+    const runPRs = RUN_MILESTONES.map(({ label, distance }) => {
+      const eligible = runs.filter((a) => a.distance >= distance)
+      if (!eligible.length) return null
+      const best = eligible.reduce((a, b) => (a.avg_pace < b.avg_pace ? a : b))
+      return { label, value: formatPace(best.avg_pace), sub: 'avg pace', id: best.id, date: best.created_at }
+    }).filter(Boolean) as { label: string; value: string; sub: string; id: string; date: string }[]
+
+    const ridePRs = RIDE_MILESTONES.map(({ label, distance }) => {
+      const eligible = rides.filter((a) => a.distance >= distance)
+      if (!eligible.length) return null
+      const best = eligible.reduce((a, b) => (a.avg_speed > b.avg_speed ? a : b))
+      return { label, value: formatSpeed(best.avg_speed), sub: 'avg speed', id: best.id, date: best.created_at }
+    }).filter(Boolean) as { label: string; value: string; sub: string; id: string; date: string }[]
+
+    return { runPRs, ridePRs }
+  }, [activities])
 
   if (loading) return <div className="max-w-4xl mx-auto px-4 py-8">
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
@@ -132,6 +169,64 @@ export default function StatsPage() {
         <div className="text-center py-12 text-gray-400">
           <div className="text-4xl mb-3">📊</div>
           <p>Log some activities to see your stats!</p>
+        </div>
+      )}
+
+      {/* ── Personal Records ─────────────────────────────────────────────── */}
+      {(personalRecords.runPRs.length > 0 || personalRecords.ridePRs.length > 0) && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+          <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2">
+            <Trophy size={18} className="text-orange-500" />
+            Personal Records
+          </h2>
+
+          {personalRecords.runPRs.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5">
+                🏃 Running
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {personalRecords.runPRs.map((pr) => (
+                  <Link
+                    key={pr.id}
+                    href={`/activities/${pr.id}`}
+                    className="group bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-100 rounded-xl p-4 hover:border-orange-300 hover:shadow-sm transition-all"
+                  >
+                    <div className="text-xs font-semibold text-orange-500 mb-1">{pr.label}</div>
+                    <div className="text-lg font-extrabold text-gray-900 group-hover:text-orange-600 transition-colors">
+                      {pr.value}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">{pr.sub}</div>
+                    <div className="text-xs text-gray-300 mt-1">{new Date(pr.date).toLocaleDateString()}</div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {personalRecords.ridePRs.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1.5">
+                🚴 Cycling
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {personalRecords.ridePRs.map((pr) => (
+                  <Link
+                    key={pr.id}
+                    href={`/activities/${pr.id}`}
+                    className="group bg-gradient-to-br from-blue-50 to-sky-50 border border-blue-100 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all"
+                  >
+                    <div className="text-xs font-semibold text-blue-500 mb-1">{pr.label}</div>
+                    <div className="text-lg font-extrabold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      {pr.value}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">{pr.sub}</div>
+                    <div className="text-xs text-gray-300 mt-1">{new Date(pr.date).toLocaleDateString()}</div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

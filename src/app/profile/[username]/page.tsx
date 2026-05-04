@@ -94,6 +94,13 @@ export default function PublicProfilePage() {
       setIsFollowing(true)
       setFollowerCount((c) => c + 1)
       toast(`Following ${profile.full_name || profile.username}!`, 'success')
+      // Notify the followed user
+      await supabase.from('notifications').insert({
+        user_id: profile.id,
+        actor_id: currentUserId,
+        type: 'follow',
+        activity_id: null,
+      })
     }
     setFollowLoading(false)
   }

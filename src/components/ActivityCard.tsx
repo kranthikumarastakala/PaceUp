@@ -38,6 +38,15 @@ export function ActivityCard({ activity, showAuthor }: Props) {
       await supabase.from('kudos').insert({ activity_id: activity.id, user_id: user.id })
       setKudos((k) => k + 1)
       await supabase.from('activities').update({ kudos_count: kudos + 1 }).eq('id', activity.id)
+      // Notify activity owner (skip self-kudos)
+      if (user.id !== activity.user_id) {
+        await supabase.from('notifications').insert({
+          user_id: activity.user_id,
+          actor_id: user.id,
+          type: 'kudos',
+          activity_id: activity.id,
+        })
+      }
     }
     setLiked(!liked)
   }

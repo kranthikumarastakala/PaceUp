@@ -69,3 +69,23 @@ export function timeAgo(date: string): string {
   if (d < 7) return `${d}d ago`
   return new Date(date).toLocaleDateString()
 }
+
+/**
+ * Upload an activity photo to Supabase Storage.
+ * Returns the public URL or null if storage is unavailable.
+ */
+export async function uploadActivityPhoto(
+  supabase: ReturnType<typeof import('./supabase/client').createClient>,
+  file: File,
+  userId: string
+): Promise<string | null> {
+  const ext = file.name.split('.').pop() ?? 'jpg'
+  const path = `${userId}/${Date.now()}.${ext}`
+  const { data, error } = await supabase.storage
+    .from('activity-photos')
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+  if (error || !data) return null
+  const { data: urlData } = supabase.storage.from('activity-photos').getPublicUrl(data.path)
+  return urlData.publicUrl
+}
+

@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useToast } from '@/components/ToastProvider'
+import { uploadActivityPhoto } from '@/lib/utils'
 import type { ActivityType, GpxPoint } from '@/lib/types'
 
 const ACTIVITY_TYPES: { value: ActivityType; label: string; icon: string }[] = [
@@ -60,6 +61,9 @@ export default function EditActivityPage() {
   const [isPublic, setIsPublic] = useState(true)
   const [gpxData, setGpxData] = useState<GpxPoint[]>([])
   const [gpxFileName, setGpxFileName] = useState('')
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
   // Load existing activity
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function EditActivityPage() {
       setElevationM(data.elevation_gain > 0 ? String(Math.round(data.elevation_gain)) : '')
       setIsPublic(data.is_public)
       if (data.gpx_data) setGpxData(data.gpx_data)
+      if (data.photo_url) setExistingPhotoUrl(data.photo_url)
       setInitialLoading(false)
     }
     load()
@@ -121,6 +126,16 @@ export default function EditActivityPage() {
     const avgSpeed = distanceM > 0 && durationS > 0 ? (distanceM / 1000) / (durationS / 3600) : 0
     const calories = Math.round((durationS / 60) * 8)
 
+    // Upload new photo if one was selected
+    let finalPhotoUrl = existingPhotoUrl
+    if (photoFile) {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const uploaded = await uploadActivityPhoto(supabase, photoFile, user.id)
+        if (uploaded) finalPhotoUrl = uploaded
+      }
+    }
+
     const { error } = await supabase
       .from('activities')
       .update({
@@ -136,6 +151,7 @@ export default function EditActivityPage() {
         gpx_data: gpxData.length > 0 ? gpxData : null,
         start_latlng: gpxData.length > 0 ? [gpxData[0].lat, gpxData[0].lng] : null,
         is_public: isPublic,
+        photo_url: finalPhotoUrl,
       })
       .eq('id', params.id)
 
@@ -270,6 +286,55 @@ export default function EditActivityPage() {
             </div>
             <input type="file" accept=".gpx" onChange={handleGpxUpload} className="hidden" />
           </label>
+        </div>
+
+        {/* Photo Upload */}
+        <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+          <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+            Activity Photo <span className="text-gray-400 font-normal">(optional)</span>
+          </label>
+          {(photoPreview || existingPhotoUrl) ? (
+            <div className="relative rounded-xl overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={photoPreview ?? existingPhotoUrl!}
+                alt="Activity photo"
+                className="w-full h-48 object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setPhotoFile(null)
+                  setPhotoPreview(null)
+                  setExistingPhotoUrl(null)
+                }}
+                className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white text-xs font-medium px-2.5 py-1 rounded-lg transition-colors"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <label className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-dashed border-purple-200 rounded-xl px-4 py-5 cursor-pointer hover:border-purple-400 transition-all group">
+              <span className="text-3xl">📷</span>
+              <div>
+                <div className="text-sm font-semibold text-gray-700 group-hover:text-purple-600 transition-colors">
+                  Click to upload a photo
+                </div>
+                <div className="text-xs text-gray-400 mt-0.5">JPG, PNG, WEBP — max 5 MB</div>
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setPhotoFile(file)
+                  setPhotoPreview(URL.createObjectURL(file))
+                }}
+                className="hidden"
+              />
+            </label>
+          )}
         </div>
 
         {/* Description */}

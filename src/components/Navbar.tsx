@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Activity, Home, User, PlusCircle, BarChart2, LogOut, Menu, X } from 'lucide-react'
+import { Activity, Home, User, PlusCircle, BarChart2, LogOut, Menu, X, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { useEffect, useState } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
+import { NotificationBell } from '@/components/NotificationBell'
 
 const navLinks = [
   { href: '/dashboard', label: 'Feed', icon: Home },
@@ -74,6 +75,16 @@ export function Navbar() {
           <div className="flex items-center gap-2">
             {user ? (
               <>
+                {/* Search icon — desktop */}
+                <Link
+                  href="/search"
+                  className="hidden md:flex p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Search"
+                >
+                  <Search size={18} />
+                </Link>
+                {/* Notification bell */}
+                <NotificationBell userId={user.id} />
                 <Link
                   href="/activities/new"
                   className="hidden sm:flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
@@ -150,6 +161,19 @@ export function Navbar() {
                   {label}
                 </Link>
               ))}
+              {/* Search — mobile drawer */}
+              <Link
+                href="/search"
+                className={cn(
+                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors',
+                  pathname === '/search'
+                    ? 'bg-orange-500/10 text-orange-600'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                )}
+              >
+                <Search size={18} />
+                Search
+              </Link>
               <Link
                 href="/activities/new"
                 className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium bg-orange-500 text-white hover:bg-orange-600 transition-colors mt-2"

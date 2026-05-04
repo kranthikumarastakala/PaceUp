@@ -56,6 +56,15 @@ export default function ActivityDetailPage() {
     } else {
       await supabase.from('kudos').insert({ activity_id: activity.id, user_id: currentUserId })
       setKudos((k) => k + 1)
+      // Notify activity owner (skip self-kudos)
+      if (currentUserId !== activity.user_id) {
+        await supabase.from('notifications').insert({
+          user_id: activity.user_id,
+          actor_id: currentUserId,
+          type: 'kudos',
+          activity_id: activity.id,
+        })
+      }
     }
     setLiked(!liked)
   }
@@ -134,6 +143,14 @@ export default function ActivityDetailPage() {
         <RouteMap points={activity.gpx_data} height="350px" />
       )}
 
+      {/* Activity photo */}
+      {activity.photo_url && (
+        <div className="rounded-2xl overflow-hidden shadow-sm border border-gray-100">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={activity.photo_url} alt={activity.title} className="w-full max-h-96 object-cover" />
+        </div>
+      )}
+
       {/* Stats grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {stats.map(({ icon: Icon, label, value }) => (
@@ -177,7 +194,7 @@ export default function ActivityDetailPage() {
       </div>
 
       {/* Comments */}
-      <Comments activityId={activity.id} />
+      <Comments activityId={activity.id} activityOwnerId={activity.user_id} />
 
       {/* Delete confirmation modal */}
       {showDeleteModal && (

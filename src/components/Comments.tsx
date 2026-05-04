@@ -9,9 +9,10 @@ import { Trash2, MessageCircle, Send } from 'lucide-react'
 
 interface CommentsProps {
   activityId: string
+  activityOwnerId?: string
 }
 
-export function Comments({ activityId }: CommentsProps) {
+export function Comments({ activityId, activityOwnerId }: CommentsProps) {
   const supabase = createClient()
   const { toast } = useToast()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -57,6 +58,15 @@ export function Comments({ activityId }: CommentsProps) {
       setComments((prev) => [...prev, data as Comment])
       setBody('')
       textareaRef.current?.focus()
+      // Notify activity owner (skip self-comments)
+      if (activityOwnerId && currentUserId !== activityOwnerId) {
+        await supabase.from('notifications').insert({
+          user_id: activityOwnerId,
+          actor_id: currentUserId,
+          type: 'comment',
+          activity_id: activityId,
+        })
+      }
     }
     setSubmitting(false)
   }
